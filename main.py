@@ -39,6 +39,7 @@ ARUKERESO_ONLY = True
 FOUND_FILE = "found.txt"
 NOT_FOUND_FILE = "not_found.txt"
 PRODUCTS_FILE = "products.txt"
+PRODUCTS_FILE_ALT = "product.txt"
 USE_ARUKERESO_TOP = False
 ARUKERESO_TOP_URLS = [
     "https://www.arukereso.hu/videokartya-c3142/?sgst=1",
@@ -533,6 +534,52 @@ def detect_brand_domains(name: str, brand_domains: dict[str, list[str]]) -> list
             if a in n:
                 return doms
     return []
+
+
+def detect_primary_brand(name: str) -> str | None:
+    n = name.lower()
+    # Prefer longest brand keys to match multi-word brands first
+    for brand in sorted(BRAND_SYNONYMS.keys(), key=len, reverse=True):
+        for alias in BRAND_SYNONYMS[brand]:
+            if alias in n:
+                return brand
+    return None
+
+
+def default_domains_for_brand(brand: str) -> list[str]:
+    for aliases, doms in DEFAULT_BRAND_DOMAIN_MAP:
+        if brand in aliases:
+            return doms
+    return []
+
+
+def ensure_brands_file(path: str, products: list[str]) -> None:
+    try:
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            return
+    except Exception:
+        # If we cannot stat the file, just try to write it.
+        pass
+
+    detected: dict[str, list[str]] = {}
+    for name in products:
+        brand = detect_primary_brand(name)
+        if not brand:
+            continue
+        if brand not in detected:
+            detected[brand] = default_domains_for_brand(brand)
+
+    if not detected:
+        return
+
+    # Write a minimal brands.csv that load_brand_domains() can read.
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, delimiter=";")
+        writer.writerow(["brand", "aliases", "domains"])
+        for brand in sorted(detected.keys()):
+            aliases = ",".join(BRAND_SYNONYMS.get(brand, [brand]))
+            domains = ",".join(detected[brand])
+            writer.writerow([brand, aliases, domains])
 
 
 def build_manufacturer_queries(name: str, domains: list[str]) -> list[str]:
@@ -1048,6 +1095,7 @@ def format_found_lines(files: list[str], start_index: int) -> tuple[list[str], i
 def main() -> None:
     products = read_unique_products(INPUT_FILE)
     product_colors = read_product_colors(INPUT_FILE)
+    ensure_brands_file(BRANDS_FILE, products)
     brand_domains = load_brand_domains(BRANDS_FILE)
     driver = setup_driver()
     global _ACTIVE_DRIVER
@@ -1083,6 +1131,8 @@ def main() -> None:
 
     with open(PRODUCTS_FILE, "w", encoding="utf-8") as f:
         pass
+    with open(PRODUCTS_FILE_ALT, "w", encoding="utf-8") as f:
+        pass
     with open(FOUND_FILE, "w", encoding="utf-8") as f:
         pass
     with open(NOT_FOUND_FILE, "w", encoding="utf-8") as f:
@@ -1092,6 +1142,8 @@ def main() -> None:
         ensure_driver()
         if name not in product_seen:
             with open(PRODUCTS_FILE, "a", encoding="utf-8") as f:
+                f.write(name + "\n")
+            with open(PRODUCTS_FILE_ALT, "a", encoding="utf-8") as f:
                 f.write(name + "\n")
             product_seen.add(name)
         base = clean_filename(name)

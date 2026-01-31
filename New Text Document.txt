@@ -1038,14 +1038,6 @@ be quiet! Power Zone 2 1000W 80 PLUS Platinum (BP008EU);Connectivity Technology;
 be quiet! Power Zone 2 1000W 80 PLUS Platinum (BP008EU);Connectivity Technology;4
 be quiet! Power Zone 2 1000W 80 PLUS Platinum (BP008EU);Modular;N/A
 be quiet! Power Zone 2 1000W 80 PLUS Platinum (BP008EU);Color;N/A
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Wattage;650
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Efficiency Rating;80+ Bronze
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;1
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;2
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;5
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;2
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Modular;N/A
-MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Color;N/A
 Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Wattage;850
 Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Efficiency Rating;80+ Gold
 Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Connectivity Technology;No
@@ -1054,6 +1046,14 @@ Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Connectivity Technol
 Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Connectivity Technology;4
 Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Modular;N/A
 Corsair RMx Series RM850x 850W 80 PLUS Gold (CP-9020270-EU);Color;N/A
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Wattage;650
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Efficiency Rating;80+ Bronze
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;1
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;2
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;5
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Connectivity Technology;2
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Modular;N/A
+MSI MAG A650BN 650W 80 PLUS Bronze (306-7ZP2B11-CE0);Color;N/A
 ASUS TUF Gaming 850W 80 PLUS Gold (90YE00S2-B0NA00);Wattage;850
 ASUS TUF Gaming 850W 80 PLUS Gold (90YE00S2-B0NA00);Efficiency Rating;80+ Gold
 ASUS TUF Gaming 850W 80 PLUS Gold (90YE00S2-B0NA00);Connectivity Technology;No
@@ -1102,10 +1102,6 @@ GIGABYTE GP-P550SS 550W 80 PLUS Silver;Connectivity Technology;5
 GIGABYTE GP-P550SS 550W 80 PLUS Silver;Connectivity Technology;2
 GIGABYTE GP-P550SS 550W 80 PLUS Silver;Modular;N/A
 GIGABYTE GP-P550SS 550W 80 PLUS Silver;Color;N/A
-GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Wattage;850
-GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Efficiency Rating;80+ Gold
-GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Modular;N/A
-GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Color;N/A
 GIGABYTE GP-P650SS;Wattage;650
 GIGABYTE GP-P650SS;Efficiency Rating;80+ Silver
 GIGABYTE GP-P650SS;Connectivity Technology;No
@@ -1114,6 +1110,10 @@ GIGABYTE GP-P650SS;Connectivity Technology;5
 GIGABYTE GP-P650SS;Connectivity Technology;2
 GIGABYTE GP-P650SS;Modular;N/A
 GIGABYTE GP-P650SS;Color;N/A
+GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Wattage;850
+GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Efficiency Rating;80+ Gold
+GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Modular;N/A
+GIGABYTE P850GM 850W 80 PLUS Gold (GP-P850GM);Color;N/A
 Keep Out FX1000MU 1000W;Wattage;1000
 Keep Out FX1000MU 1000W;Efficiency Rating;80+ Gold
 Keep Out FX1000MU 1000W;Modular;N/A
