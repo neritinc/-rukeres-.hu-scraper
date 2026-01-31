@@ -20,6 +20,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # --- BEALLITASOK ---
 INPUT_FILE = "New Text Document.txt"
 OUTPUT_DIR = "kepek2"
+OUTPUT_DIRS = [OUTPUT_DIR, "kepek"]
 BRANDS_FILE = "brands.csv"
 IMAGES_PER_PRODUCT = 3
 MIN_FILE_SIZE = 1
@@ -1048,48 +1049,63 @@ def process_image(data: bytes) -> bytes | None:
         return None
 
 
-def save_processed_image(data: bytes, path: str) -> bool:
+def save_processed_image(data: bytes, path: str) -> tuple[bool, str | None]:
     ok, w, h = check_image_size(data)
     if not ok:
         if LOG_REJECTS:
             print(f"    x kicsi kep: {w}x{h}")
-        return False
+        return False, None
     processed = process_image(data)
     if not processed:
-        return False
+        return False, None
     if len(processed) < MIN_FILE_SIZE:
-        return False
+        return False, None
+    processed_hash = hashlib.sha1(processed).hexdigest()
     with open(path, "wb") as f:
         f.write(processed)
-    return True
+    return True, processed_hash
 
 
 def list_existing_images(base: str) -> list[str]:
     matches: list[tuple[int, str]] = []
     prefix = f"{base}_"
-    try:
-        for entry in os.listdir(OUTPUT_DIR):
-            if not entry.startswith(prefix) or not entry.lower().endswith(".jpg"):
-                continue
-            suffix = entry[len(prefix):-4]
-            try:
-                idx = int(suffix)
-            except Exception:
-                continue
-            matches.append((idx, entry))
-    except Exception:
-        return []
+    for out_dir in OUTPUT_DIRS:
+        try:
+            for entry in os.listdir(out_dir):
+                if not entry.startswith(prefix) or not entry.lower().endswith(".jpg"):
+                    continue
+                suffix = entry[len(prefix):-4]
+                try:
+                    idx = int(suffix)
+                except Exception:
+                    continue
+                matches.append((idx, entry))
+        except Exception:
+            continue
     matches.sort(key=lambda x: x[0])
-    return [m[1] for m in matches[:IMAGES_PER_PRODUCT]]
+    seen = set()
+    ordered = []
+    for _, name in matches:
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+        if len(ordered) >= IMAGES_PER_PRODUCT:
+            break
+    return ordered
 
 
 def format_found_lines(files: list[str], start_index: int) -> tuple[list[str], int]:
     lines = []
     idx = start_index
     for fname in files:
-        lines.append(f"{idx}\t{fname}")
+        lines.append(f"{idx};{fname}")
         idx += 1
     return lines, idx
+
+
+def strip_paren_suffix(name: str) -> str:
+    return re.sub(r"\s*\([^)]*\)\s*$", "", name).strip()
 
 
 def main() -> None:
@@ -1147,23 +1163,15 @@ def main() -> None:
                 f.write(name + "\n")
             product_seen.add(name)
         base = clean_filename(name)
-        first_path = os.path.join(OUTPUT_DIR, f"{base}_1.jpg")
-        if os.path.exists(first_path):
-            existing = list_existing_images(base)
-            if existing:
-                lines, found_counter = format_found_lines(existing, found_counter)
-                for line in lines:
-                    found_lines.append(line)
-                    if line not in found_seen:
-                        with open(FOUND_FILE, "a", encoding="utf-8") as f:
-                            f.write(line + "\n")
-                        found_seen.add(line)
-            else:
-                not_found.append(name)
-                if name not in not_found_seen:
-                    with open(NOT_FOUND_FILE, "a", encoding="utf-8") as f:
-                        f.write(name + "\n")
-                    not_found_seen.add(name)
+        existing = list_existing_images(base)
+        if existing:
+            lines, found_counter = format_found_lines(existing, found_counter)
+            for line in lines:
+                found_lines.append(line)
+                if line not in found_seen:
+                    with open(FOUND_FILE, "a", encoding="utf-8") as f:
+                        f.write(line + "\n")
+                    found_seen.add(line)
             print(f"[{index}/{len(products)}] {name} -> mar letezik, kihagyva")
             continue
 
@@ -1214,9 +1222,11 @@ def main() -> None:
                         rejected_dup += 1
                         continue
                     out_path = os.path.join(OUTPUT_DIR, f"{base}_{count + 1}.jpg")
-                    saved = save_processed_image(data, out_path)
+                    saved, processed_hash = save_processed_image(data, out_path)
                     if saved:
                         seen_hashes.add(data_hash)
+                        if processed_hash:
+                            seen_hashes.add(processed_hash)
                         count += 1
                         saved_files.append(os.path.basename(out_path))
                         snooze(SLEEP_BETWEEN)
@@ -1224,50 +1234,60 @@ def main() -> None:
                         rejected_small += 1
 
         # Ha Arukereso nem talalt, nezzuk meg IPON-t is
-        if count < IMAGES_PER_PRODUCT:
-            toks = name_tokens(name)
+        if count < IMAGES_PER_PRODUCT and count > 0:
+            ipon_name = strip_paren_suffix(name)
+            toks = name_tokens(ipon_name)
             color_toks = product_colors.get(name, [])
-            brand_toks = detect_brand_tokens(name)
+            brand_toks = detect_brand_tokens(ipon_name)
             ensure_driver()
-            product_links = search_site_for_products(driver, "ipon.hu", name)
-            for page_url in product_links:
-                if count >= IMAGES_PER_PRODUCT:
-                    break
-                try:
-                    img_urls = extract_image_urls(driver, page_url, toks, color_toks, "ipon.hu")
-                except (WebDriverException, NoSuchWindowException):
-                    ensure_driver()
-                    try:
-                        img_urls = extract_image_urls(driver, page_url, toks, color_toks, "ipon.hu")
-                    except Exception:
-                        img_urls = []
-                if LOG_REJECTS:
-                    print(f"  -> ipon.hu termekoldal: {page_url} | kepek: {len(img_urls)}")
-                for src, text in img_urls:
+            try:
+                product_links = search_site_for_products(driver, "ipon.hu", ipon_name)
+            except Exception:
+                product_links = []
+            try:
+                for page_url in product_links:
                     if count >= IMAGES_PER_PRODUCT:
                         break
-                    if src in seen_urls:
-                        continue
-                    seen_urls.add(src)
-                    if not should_accept_image(text, toks, color_toks, brand_toks, relaxed=True):
-                        continue
-                    data = download_image(src, referer=page_url)
-                    if not data:
-                        rejected_dl += 1
-                        continue
-                    data_hash = hashlib.sha1(data).hexdigest()
-                    if data_hash in seen_hashes:
-                        rejected_dup += 1
-                        continue
-                    out_path = os.path.join(OUTPUT_DIR, f"{base}_{count + 1}.jpg")
-                    saved = save_processed_image(data, out_path)
-                    if saved:
-                        seen_hashes.add(data_hash)
-                        count += 1
-                        saved_files.append(os.path.basename(out_path))
-                        snooze(SLEEP_BETWEEN)
-                    else:
-                        rejected_small += 1
+                    try:
+                        img_urls = extract_image_urls(driver, page_url, toks, color_toks, "ipon.hu")
+                    except (WebDriverException, NoSuchWindowException):
+                        ensure_driver()
+                        try:
+                            img_urls = extract_image_urls(driver, page_url, toks, color_toks, "ipon.hu")
+                        except Exception:
+                            img_urls = []
+                    if LOG_REJECTS:
+                        print(f"  -> ipon.hu termekoldal: {page_url} | kepek: {len(img_urls)}")
+                    for src, text in img_urls:
+                        if count >= IMAGES_PER_PRODUCT:
+                            break
+                        if src in seen_urls:
+                            continue
+                        seen_urls.add(src)
+                        if not should_accept_image(text, toks, color_toks, brand_toks, relaxed=True):
+                            continue
+                        data = download_image(src, referer=page_url)
+                        if not data:
+                            rejected_dl += 1
+                            continue
+                        data_hash = hashlib.sha1(data).hexdigest()
+                        if data_hash in seen_hashes:
+                            rejected_dup += 1
+                            continue
+                        out_path = os.path.join(OUTPUT_DIR, f"{base}_{count + 1}.jpg")
+                        saved, processed_hash = save_processed_image(data, out_path)
+                        if saved:
+                            seen_hashes.add(data_hash)
+                            if processed_hash:
+                                seen_hashes.add(processed_hash)
+                            count += 1
+                            saved_files.append(os.path.basename(out_path))
+                            snooze(SLEEP_BETWEEN)
+                        else:
+                            rejected_small += 1
+            except Exception:
+                if LOG_REJECTS:
+                    print("  -> ipon.hu hiba, tovabb")
 
         if LOG_REJECTS:
             print(f"OK ({count} kep) | elutasitva: kicsi={rejected_small} letoltes={rejected_dl} duplikalt={rejected_dup}")
