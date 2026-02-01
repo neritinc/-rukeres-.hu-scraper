@@ -21,6 +21,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 INPUT_FILE = "New Text Document.txt"
 OUTPUT_DIR = "kepek2"
 OUTPUT_DIRS = [OUTPUT_DIR, "kepek"]
+OUTPUT_LIST_FILE = "kepek2_lista.txt"
 BRANDS_FILE = "brands.csv"
 IMAGES_PER_PRODUCT = 3
 MIN_FILE_SIZE = 1
@@ -1095,6 +1096,21 @@ def list_existing_images(base: str) -> list[str]:
     return ordered
 
 
+def write_output_dir_list(out_dir: str, out_file: str) -> None:
+    try:
+        entries = [
+            e
+            for e in os.listdir(out_dir)
+            if e.lower().endswith(".jpg") and os.path.isfile(os.path.join(out_dir, e))
+        ]
+    except Exception:
+        entries = []
+    entries.sort()
+    with open(out_file, "w", encoding="utf-8") as f:
+        for idx, name in enumerate(entries, start=1):
+            f.write(f"{idx};{name}\n")
+
+
 def format_found_lines(files: list[str], start_index: int) -> tuple[list[str], int]:
     lines = []
     idx = start_index
@@ -1144,6 +1160,9 @@ def main() -> None:
     not_found_seen = set()
     product_seen = set()
     found_counter = 1
+
+    # Friss mappalista kulon fajlba
+    write_output_dir_list(OUTPUT_DIR, OUTPUT_LIST_FILE)
 
     with open(PRODUCTS_FILE, "w", encoding="utf-8") as f:
         pass
