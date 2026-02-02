@@ -1,4 +1,5 @@
 import re
+import sys
 import unicodedata
 from typing import Dict, List, Tuple, Optional
 
@@ -12,9 +13,16 @@ from bs4 import BeautifulSoup
 
 
 OUTPUT_FILE = "New Text Document.txt"
+OUTPUT_PRODUCTS_FILE = "products.txt"
 UNITS_FILE = "units.csv"
-USE_SELENIUM_FALLBACK = False
-SELENIUM_WAIT_SECONDS = 6.0
+USE_SELENIUM_FALLBACK = True
+SELENIUM_WAIT_SECONDS = 12.0
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 CATEGORY_URLS: Dict[str, str] = {
     "Processor": "https://www.arukereso.hu/processzor-c3139/?sgst=1",
@@ -36,7 +44,7 @@ CATEGORY_URLS: Dict[str, str] = {
 }
 
 FALLBACK_PARAM: Dict[str, str] = {
-    "Processor": "Architecture",
+    "Processor": "Type",
     "Memory Module": "Memory Type",
     "Motherboard": "Socket",
     "Graphics Card": "DirectX Version",
@@ -57,45 +65,51 @@ FALLBACK_PARAM: Dict[str, str] = {
 # parameter -> unit, from ParameterSeeder.php
 CATEGORY_PARAMS: Dict[str, List[str]] = {
     "Processor": [
-        "Clock Speed",
-        "Turbo Clock Speed",
+        "Type",
         "Core Count",
         "Thread Count",
+        "Socket",
+        "Clock Speed",
+        "Turbo Clock Speed",
+        "Manufacturing Process",
+        "Integrated Graphics",
         "L2 Cache Size",
         "L3 Cache Size",
         "Thermal Design Power (TDP)",
-        "Integrated Graphics",
+        "Package",
     ],
     "Memory Module": [
-        "Memory Capacity",
+        "Capacity",
+        "Package",
         "Memory Type",
-        "Bus Speed",
-        "CAS Latency",
+        "Speed",
+        "Multi-channel Package",
+        "Memory Latency",
+        "LED Lighting",
     ],
     "Motherboard": [
         "Socket",
         "Chipset",
-        "Form Factor",
-        "Memory Slots",
-        "M.2 Slots",
-        "Max Memory",
+        "CPU Manufacturer",
         "Memory Type",
-        "PCIe Slots",
-        "Wireless Networking",
-        "RAID Support",
+        "Memory Slots",
+        "SATA 3 Ports",
+        "M.2 Slots",
+        "USB Ports",
+        "Form Factor",
     ],
     "Graphics Card": [
-        "VRAM",
-        "Core Clock",
-        "Boost Clock",
-        "Memory Clock",
-        "CUDA Cores",
-        "DirectX Version",
-        "Thermal Design Power (TDP)",
+        "PCIe Generation",
         "Cooling Fans",
-        "Length",
+        "Core Clock",
+        "Memory Clock",
+        "VRAM",
         "Memory Type",
-        "Video Chipset Family",
+        "Memory Bus",
+        "Recommended PSU",
+        "Max Resolution",
+        "HDMI Ports",
+        "DisplayPort Ports",
     ],
     "Storage": [
         "Capacity",
@@ -105,53 +119,66 @@ CATEGORY_PARAMS: Dict[str, List[str]] = {
         "Connectivity Technology",
     ],
     "Power Supply": [
+        "PSU Type",
         "Wattage",
         "Efficiency Rating",
-        "Modular",
-        "Wattage",
-        "Color",
+        "Fan Size",
+        "SATA Connectors",
+        "PCIe Connectors",
     ],
     "Cooling": [
-        "Color",
-        "Lighting",
-        "Cooling",
-        "Radiator Size",
+        "Type",
+        "Fan Diameter",
         "Fan RPM",
-        "Noise Level",
-        "CPU Socket",
+        "LED Lighting",
+        "Dimensions",
+        "Weight",
     ],
     "Monitor": [
+        "Type",
         "Screen Size",
+        "Aspect Ratio",
         "Resolution",
+        "Response Time",
         "Refresh Rate",
-        "Panel Type",
+        "Speakers",
+        "AMD FreeSync",
+        "Nvidia G-Sync",
     ],
     "Mouse": [
-        "Color",
+        "Signal",
         "Connectivity Technology",
         "DPI",
-        "Wireless",
-        "Battery Life",
+        "Key Amounts",
+        "Color",
+        "Weight",
     ],
     "Case": [
         "Type",
-        "Dimensions",
+        "Width",
+        "Height",
+        "Depth",
+        "Weight",
+        "2.5\" Bays",
+        "3.5\" Bays",
+        "USB Ports",
+        "Transparent Side Panel",
         "Color",
-        "Side Panel",
-        "Max GPU Length",
-        "Drive Bays",
-        "Radiator Support",
-        "Motherboard Form Factor",
-        "Warranty",
+        "ATX Support",
+        "Micro ATX Support",
+        "Extended ATX Support",
+        "Mini ITX Support",
     ],
     "Case Fan": [
-        "Color",
-        "Fan Size",
-        "Fan height",
+        "Fan Diameter",
         "Fan RPM",
         "Noise Level",
-        "Fan Connectors",
-        "Warranty",
+        "Airflow",
+        "PWM",
+        "Connector",
+        "LED Lighting",
+        "Dimensions",
+        "Weight",
     ],
     "Keyboard": [
         "Color",
@@ -161,10 +188,9 @@ CATEGORY_PARAMS: Dict[str, List[str]] = {
         "Compatible",
     ],
     "Webcam": [
-        "Resolution",
-        "Connectivity Technology",
-        "Focus Type",
-        "FOV Angle",
+        "Microphone",
+        "Max FPS",
+        "Video Resolution",
     ],
     "Headset": [
         "Coldor",
@@ -201,30 +227,37 @@ CATEGORY_PARAMS: Dict[str, List[str]] = {
 
 PARAM_UNITS: Dict[str, str] = {
     # Processor
+    "Type": "Type",
     "Clock Speed": "MHz",
     "Turbo Clock Speed": "MHz",
     "Core Count": "Pcs",
     "Thread Count": "Pcs",
     "L2 Cache Size": "MB",
     "L3 Cache Size": "MB",
+    "Socket": "N/A",
+    "Manufacturing Process": "nm",
+    "Integrated Graphics": "Type",
+    "Package": "Type",
     "Thermal Design Power (TDP)": "W",
     "Architecture": "N/A",
-    "Integrated Graphics": "Type",
     # Memory Module
-    "Memory Capacity": "GB",
+    "Capacity": "GB",
+    "Package": "Type",
     "Memory Type": "N/A",
-    "Bus Speed": "MHz",
-    "CAS Latency": "CL",
+    "Speed": "MHz",
+    "Multi-channel Package": "Type",
+    "Memory Latency": "CL",
+    "LED Lighting": "Yes/No",
     # Motherboard
     "Socket": "N/A",
     "Chipset": "N/A",
-    "Form Factor": "N/A",
+    "CPU Manufacturer": "N/A",
+    "Memory Type": "N/A",
     "Memory Slots": "Pcs",
+    "SATA 3 Ports": "Pcs",
     "M.2 Slots": "Pcs",
-    "Max Memory": "GB",
-    "PCIe Slots": "Pcs",
-    "Wireless Networking": "N/A",
-    "RAID Support": "Yes/No",
+    "USB Ports": "Pcs",
+    "Form Factor": "N/A",
     # Graphics Card
     "VRAM": "GB",
     "Core Clock": "MHz",
@@ -243,22 +276,29 @@ PARAM_UNITS: Dict[str, str] = {
     "Maximum Write Speed": "MB/s",
     "Connectivity Technology": "N/A",
     # Power Supply
+    "PSU Type": "Type",
     "Wattage": "W",
     "Efficiency Rating": "N/A",
-    "Modular": "Full",
-    "Color": "Color",
+    "Fan Size": "mm",
+    "SATA Connectors": "Pcs",
+    "PCIe Connectors": "Pcs",
     # Cooling
-    "Lighting": "Color",
-    "Cooling": "Cooled",
-    "Radiator Size": "mm",
+    "Type": "N/A",
+    "Fan Diameter": "mm",
     "Fan RPM": "RPM",
-    "Noise Level": "dB",
-    "CPU Socket": "-",
+    "LED Lighting": "Yes/No",
+    "Dimensions": "mm",
+    "Weight": "g",
     # Monitor
+    "Type": "N/A",
     "Screen Size": "inch",
+    "Aspect Ratio": "N/A",
     "Resolution": "N/A",
+    "Response Time": "ms",
     "Refresh Rate": "Hz",
-    "Panel Type": "N/A",
+    "Speakers": "Yes/No",
+    "AMD FreeSync": "Yes/No",
+    "Nvidia G-Sync": "Yes/No",
     # Mouse
     "DPI": "DPI",
     "Wireless": "Yes/No",
@@ -365,7 +405,7 @@ def resolve_unit(param_name: str, unit_set: set[str]) -> str:
     return unit
 
 
-def convert_value(param_name: str, raw_value: str, unit_set: set[str]) -> str:
+def convert_value(category: str, param_name: str, raw_value: str, unit_set: set[str]) -> str:
     unit = resolve_unit(param_name, unit_set)
     v = raw_value.replace("\xa0", " ").strip()
     v_norm = norm_text(v)
@@ -373,7 +413,7 @@ def convert_value(param_name: str, raw_value: str, unit_set: set[str]) -> str:
     if unit in {"Yes/No"}:
         return yes_no_from_text(v)
 
-    if param_name == "CAS Latency":
+    if param_name in {"CAS Latency", "Memory Latency"}:
         v_norm = v_norm.replace("cl", "")
         num = first_number(v_norm)
         return num or v.strip()
@@ -383,8 +423,10 @@ def convert_value(param_name: str, raw_value: str, unit_set: set[str]) -> str:
         if not num:
             return v.strip()
         val = float(num)
-        if "gb" in v_norm and "tb" not in v_norm:
-            val = val / 1000.0
+        # Storage uses TB; memory modules should keep GB.
+        if category == "Storage":
+            if "gb" in v_norm and "tb" not in v_norm:
+                val = val / 1000.0
         if abs(val - round(val)) < 1e-6:
             return str(int(round(val)))
         return f"{val:.2f}".rstrip("0").rstrip(".")
@@ -404,8 +446,11 @@ def map_specs(category: str, specs: Dict[str, str], unit_set: set[str]) -> List[
         param = map_label_to_param(category, hu_label)
         if not param:
             continue
+        # Keep only parameters explicitly requested for this category.
+        if param not in CATEGORY_PARAMS.get(category, []):
+            continue
         value = translate_value(raw_val)
-        value = convert_value(param, value, unit_set)
+        value = convert_value(category, param, value, unit_set)
         mapped.append((param, value))
         present.add(param)
 
@@ -575,75 +620,65 @@ LABEL_MAP_COMMON = {
 
 LABEL_MAP_BY_CATEGORY: Dict[str, Dict[str, str]] = {
     "Processor": {
-        "orajel": "Clock Speed",
-        "alap orajel": "Clock Speed",
-        "turbo orajel": "Turbo Clock Speed",
-        "max orajel": "Turbo Clock Speed",
-        "processzor orajel": "Clock Speed",
-        "processzor órajel": "Clock Speed",
-        "processzor turbo orajel": "Turbo Clock Speed",
-        "processzor turbo órajel": "Turbo Clock Speed",
+        "tipus": "Type",
         "magok szama": "Core Count",
         "szalak szama": "Thread Count",
-        "l2 gyorsito": "L2 Cache Size",
-        "l2 gyorsító": "L2 Cache Size",
-        "l2 cache": "L2 Cache Size",
-        "l3 gyorsito": "L3 Cache Size",
-        "l3 gyorsító": "L3 Cache Size",
-        "l3 cache": "L3 Cache Size",
-        "tdp": "Thermal Design Power (TDP)",
-        "architektura": "Architecture",
-        "architektúra": "Architecture",
+        "processzor foglalat": "Socket",
+        "orajel": "Clock Speed",
+        "alap orajel": "Clock Speed",
+        "processzor orajel": "Clock Speed",
+        "turbo orajel": "Turbo Clock Speed",
+        "max orajel": "Turbo Clock Speed",
+        "processzor turbo orajel": "Turbo Clock Speed",
+        "gyartasi technologia": "Manufacturing Process",
         "integralt grafikai processzor": "Integrated Graphics",
-        "integrált grafikai processzor": "Integrated Graphics",
+        "l2 cache": "L2 Cache Size",
+        "l2 gyorsito": "L2 Cache Size",
+        "l3 cache": "L3 Cache Size",
+        "l3 gyorsito": "L3 Cache Size",
+        "tdp": "Thermal Design Power (TDP)",
+        "kiszereles": "Package",
     },
     "Memory Module": {
-        "kapacitas": "Memory Capacity",
-        "kapacitás": "Memory Capacity",
+        "kapacitas": "Capacity",
+        "kiszereles": "Package",
         "memoria tipusa": "Memory Type",
-        "memória típusa": "Memory Type",
-        "orajel": "Bus Speed",
-        "cas latency": "CAS Latency",
-        "cas kesleltetes": "CAS Latency",
-        "cas késleltetés": "CAS Latency",
+        "sebesseg": "Speed",
+        "orajel": "Speed",
+        "tobbcsatornas kiszereles": "Multi-channel Package",
+        "memoriakesleltetes": "Memory Latency",
+        "led megvilagitas": "LED Lighting",
     },
+
     "Motherboard": {
+        "cpu foglalat": "Socket",
         "foglalat": "Socket",
         "chipset": "Chipset",
-        "formatum": "Form Factor",
-        "memoria foglalatok": "Memory Slots",
-        "memória foglalatok": "Memory Slots",
-        "m.2": "M.2 Slots",
-        "max memoria": "Max Memory",
+        "processzor gyarto": "CPU Manufacturer",
         "memoria tipusa": "Memory Type",
-        "pci-e": "PCIe Slots",
-        "pcie": "PCIe Slots",
-        "vezetek nelkuli halozat": "Wireless Networking",
-        "vezeték nélküli hálózat": "Wireless Networking",
-        "raid": "RAID Support",
+        "memoria foglalatok szama": "Memory Slots",
+        "sata 3 csatlakozok szama": "SATA 3 Ports",
+        "m.2 csatlakozok szama": "M.2 Slots",
+        "usb portok szama": "USB Ports",
+        "meret szabvany": "Form Factor",
     },
+
     "Graphics Card": {
-        "memoria merete": "VRAM",
-        "memória mérete": "VRAM",
-        "gpu orajel": "Core Clock",
-        "gpu órajel": "Core Clock",
-        "boost orajel": "Boost Clock",
-        "boost órajel": "Boost Clock",
-        "memoria orajel": "Memory Clock",
-        "memória órajel": "Memory Clock",
-        "cuda magok": "CUDA Cores",
-        "directx": "DirectX Version",
-        "tdp": "Thermal Design Power (TDP)",
+        "pci-e generacio": "PCIe Generation",
+        "pcie generacio": "PCIe Generation",
         "ventilatorok szama": "Cooling Fans",
-        "ventilátorok száma": "Cooling Fans",
-        "hosszusag": "Length",
-        "hosszúság": "Length",
+        "grafikus chip sebessege": "Core Clock",
+        "grafikus mem?ria sebessege": "Memory Clock",
+        "grafikus memoria sebessege": "Memory Clock",
+        "memoria merete": "VRAM",
         "memoria tipusa": "Memory Type",
-        "memória típusa": "Memory Type",
-        "video chipset termekcsalad": "Video Chipset Family",
-        "videó chipset termékcsalád": "Video Chipset Family",
-        "video chipset": "Video Chipset Family",
+        "memoria savszelesseg": "Memory Bus",
+        "ajanlott tapegyseg": "Recommended PSU",
+        "maximalis felbontas": "Max Resolution",
+        "hdmi csatlakozok szama": "HDMI Ports",
+        "displayport csatlakozok szama": "DisplayPort Ports",
     },
+
     "Storage": {
         "kapacitas": "Capacity",
         "kapacitás": "Capacity",
@@ -658,87 +693,97 @@ LABEL_MAP_BY_CATEGORY: Dict[str, Dict[str, str]] = {
         "interfész": "Connectivity Technology",
     },
     "Power Supply": {
-        "teljesitmeny": "Wattage",
-        "teljesítmény": "Wattage",
+        "tapegyseg tipusa": "PSU Type",
+        "tapegyseg teljesitmenye": "Wattage",
         "hatasfok": "Efficiency Rating",
-        "hatásfok": "Efficiency Rating",
-        "modularis": "Modular",
-        "moduláris": "Modular",
-        "szin": "Color",
-        "szín": "Color",
+        "ventilator merete": "Fan Size",
+        "sata csatlakozo": "SATA Connectors",
+        "sata csatlakozo szama": "SATA Connectors",
+        "pci-express csatlakozo": "PCIe Connectors",
+        "pci-express csatlakozo szama": "PCIe Connectors",
     },
+
     "Cooling": {
-        "szin": "Color",
-        "szín": "Color",
-        "vilagitas": "Lighting",
-        "világítás": "Lighting",
-        "hutes tipusa": "Cooling",
-        "hűtés típusa": "Cooling",
-        "radiator meret": "Radiator Size",
-        "radiátor méret": "Radiator Size",
-        "fordulatszam": "Fan RPM",
-        "fordulatszám": "Fan RPM",
-        "zajszint": "Noise Level",
-        "cpu foglalat": "CPU Socket",
+        "tipus": "Type",
+        "ventilator atmeroje": "Fan Diameter",
+        "ventilator fordulatszama": "Fan RPM",
+        "led megvilagitas": "LED Lighting",
+        "meretek": "Dimensions",
+        "tomeg": "Weight",
     },
+
     "Monitor": {
-        "kepernyo meret": "Screen Size",
-        "képernyő méret": "Screen Size",
+        "tipus": "Type",
+        "kepatlo": "Screen Size",
+        "k?patlo": "Screen Size",
+        "keparany": "Aspect Ratio",
+        "k?parany": "Aspect Ratio",
         "felbontas": "Resolution",
-        "felbontás": "Resolution",
-        "frissitesi frekvencia": "Refresh Rate",
-        "frissítési frekvencia": "Refresh Rate",
-        "panel tipus": "Panel Type",
-        "panel típus": "Panel Type",
+        "felbont?s": "Resolution",
+        "valaszido": "Response Time",
+        "v?laszid?": "Response Time",
+        "kepfrissitesi frekvencia": "Refresh Rate",
+        "k?pfriss?t?si frekvencia": "Refresh Rate",
+        "hangszoro": "Speakers",
+        "hangsz?r?": "Speakers",
+        "amd freesync tamogatas": "AMD FreeSync",
+        "amd freesync t?mogat?s": "AMD FreeSync",
+        "nvidia g-sync tamogatas": "Nvidia G-Sync",
+        "nvidia g-sync t?mogat?s": "Nvidia G-Sync",
     },
+
     "Mouse": {
+        "jelatvitel": "Signal",
+        "jel?tvitel": "Signal",
+        "eger csatlakoztatasa": "Connectivity Technology",
+        "eg?r csatlakoztat?sa": "Connectivity Technology",
+        "erzekenyseg": "DPI",
+        "?rz?kenys?g": "DPI",
+        "gombok szama": "Key Amounts",
+        "gombok sz?ma": "Key Amounts",
         "szin": "Color",
-        "szín": "Color",
-        "csatlakozas": "Connectivity Technology",
-        "csatlakozás": "Connectivity Technology",
-        "billentyuzet csatlakoztatasa": "Connectivity Technology",
-        "billentyűzet csatlakoztatása": "Connectivity Technology",
-        "kiosztas": "Layout",
-        "kiosztás": "Layout",
-        "mechanikus": "Mechanical",
-        "dpi": "DPI",
-        "vezetek nelkuli": "Wireless",
-        "vezeték nélküli": "Wireless",
-        "akkumulator uzemido": "Battery Life",
-        "akkumulátor üzemidő": "Battery Life",
+        "sz?n": "Color",
+        "tomeg": "Weight",
+        "t?meg": "Weight",
     },
+
     "Case": {
         "tipus": "Type",
-        "típus": "Type",
-        "meret": "Dimensions",
-        "méret": "Dimensions",
+        "szelesseg": "Width",
+        "magassag": "Height",
+        "melyseg": "Depth",
+        "tomeg": "Weight",
+        "2.5\" belso bovitohely": "2.5\" Bays",
+        "3.5\" belso bovitohely": "3.5\" Bays",
+        "usb csatlakozok szama": "USB Ports",
+        "atlatszo oldalfal": "Transparent Side Panel",
         "szin": "Color",
-        "szín": "Color",
-        "oldallap": "Side Panel",
-        "max vga hossz": "Max GPU Length",
-        "max gpu hossz": "Max GPU Length",
-        "meghajtohelyek": "Drive Bays",
-        "meghajtóhelyek": "Drive Bays",
-        "radiator tamogatas": "Radiator Support",
-        "radiátor támogatás": "Radiator Support",
-        "alaplap formatum": "Motherboard Form Factor",
-        "alaplap formátum": "Motherboard Form Factor",
-        "garancia": "Warranty",
+        "atx": "ATX Support",
+        "micro atx": "Micro ATX Support",
+        "extended atx": "Extended ATX Support",
+        "mini itx": "Mini ITX Support",
     },
+
     "Case Fan": {
-        "szin": "Color",
-        "szín": "Color",
-        "meret": "Fan Size",
-        "méret": "Fan Size",
-        "magassag": "Fan height",
-        "magasság": "Fan height",
-        "fordulatszam": "Fan RPM",
-        "fordulatszám": "Fan RPM",
-        "zajszint": "Noise Level",
-        "csatlakozo": "Fan Connectors",
-        "csatlakozó": "Fan Connectors",
-        "garancia": "Warranty",
+        "ventilator atmeroje": "Fan Diameter",
+        "ventil?tor ?tm?r?je": "Fan Diameter",
+        "ventilator fordulatszama": "Fan RPM",
+        "ventil?tor fordulatsz?ma": "Fan RPM",
+        "maximalis zajszint": "Noise Level",
+        "maxim?lis zajszint": "Noise Level",
+        "leveg??raml?s": "Airflow",
+        "legaramlas": "Airflow",
+        "pwm": "PWM",
+        "csatlakozo": "Connector",
+        "csatlakoz?": "Connector",
+        "led megvilagitas": "LED Lighting",
+        "led megvil?g?t?s": "LED Lighting",
+        "meretek": "Dimensions",
+        "m?retek": "Dimensions",
+        "tomeg": "Weight",
+        "t?meg": "Weight",
     },
+
     "Keyboard": {
         "szin": "Color",
         "szín": "Color",
@@ -758,14 +803,13 @@ LABEL_MAP_BY_CATEGORY: Dict[str, Dict[str, str]] = {
         "csatlakozás": "Connectivity Technology",
     },
     "Webcam": {
-        "felbontas": "Resolution",
-        "felbontás": "Resolution",
-        "csatlakozas": "Connectivity Technology",
-        "csatlakozás": "Connectivity Technology",
-        "fokusz": "Focus Type",
-        "latozog": "FOV Angle",
-        "látószög": "FOV Angle",
+        "mikrofon": "Microphone",
+        "maximalis kepfrissites": "Max FPS",
+        "maxim?lis k?pfriss?t?s": "Max FPS",
+        "videofelbontas": "Video Resolution",
+        "vide?felbont?s": "Video Resolution",
     },
+
     "Headset": {
         "szin": "Coldor",
         "szín": "Coldor",
@@ -832,7 +876,7 @@ def fetch_detail_specs(session: requests.Session, url: str) -> Dict[str, str]:
     if not url:
         return {}
     try:
-        html = fetch_html(session, url)
+        html = fetch_html(session, url + "#termek-leiras")
     except Exception:
         return {}
     soup = BeautifulSoup(html, "html.parser")
@@ -844,6 +888,21 @@ def fetch_detail_specs(session: requests.Session, url: str) -> Dict[str, str]:
         if not name_el or not tds:
             continue
         val_el = tds[-1]
+        label = name_el.get_text(" ", strip=True)
+        value = val_el.get_text(" ", strip=True)
+        label = re.sub(r"\s+", " ", label).strip()
+        value = re.sub(r"\s+", " ", value).strip()
+        if label and value and label not in specs:
+            specs[label] = value
+
+    # Generic property rows (some pages render these without a table class)
+    for name_el in soup.select("td.property-name"):
+        row = name_el.parent
+        if not row:
+            continue
+        val_el = row.select_one("td.property-value")
+        if not val_el:
+            continue
         label = name_el.get_text(" ", strip=True)
         value = val_el.get_text(" ", strip=True)
         label = re.sub(r"\s+", " ", label).strip()
@@ -905,6 +964,7 @@ def fetch_detail_specs_selenium(driver: webdriver.Chrome, url: str) -> Dict[str,
             pass
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
+        found_property_rows = False
 
         for row in soup.select("table.product-properties tr"):
             name_el = row.select_one("td.prop-name")
@@ -918,6 +978,21 @@ def fetch_detail_specs_selenium(driver: webdriver.Chrome, url: str) -> Dict[str,
             value = re.sub(r"\s+", " ", value).strip()
             if label and value and label not in specs:
                 specs[label] = value
+
+        for name_el in soup.select("td.property-name"):
+            row = name_el.parent
+            if not row:
+                continue
+            val_el = row.select_one("td.property-value")
+            if not val_el:
+                continue
+            label = name_el.get_text(" ", strip=True)
+            value = val_el.get_text(" ", strip=True)
+            label = re.sub(r"\s+", " ", label).strip()
+            value = re.sub(r"\s+", " ", value).strip()
+            if label and value and label not in specs:
+                specs[label] = value
+                found_property_rows = True
 
         for table in soup.select("table.property-sheet"):
             for row in table.select("tr"):
@@ -933,6 +1008,8 @@ def fetch_detail_specs_selenium(driver: webdriver.Chrome, url: str) -> Dict[str,
                     specs[label] = value
             if specs:
                 return specs
+        if found_property_rows:
+            return specs
         time.sleep(0.6)
     return specs
 
@@ -950,7 +1027,13 @@ def main() -> None:
         }
     )
 
-    lines: List[str] = ["product_name;parameter_name;value"]
+    # Stream output so the txt updates while running
+    # Track unique products for products.txt
+    products_seen = set()
+    products_f = open(OUTPUT_PRODUCTS_FILE, "w", encoding="utf-8")
+    out_f = open(OUTPUT_FILE, "w", encoding="utf-8")
+    out_f.write("product_name;parameter_name;value\n")
+    out_f.flush()
     unit_set = load_units(UNITS_FILE)
 
     driver = setup_driver() if USE_SELENIUM_FALLBACK else None
@@ -967,19 +1050,25 @@ def main() -> None:
                 specs = fetch_detail_specs_selenium(driver, url)
             mapped = map_specs(category, specs, unit_set)
             product_name = clean_product_name(name)
+            if product_name not in products_seen:
+                products_seen.add(product_name)
+                products_f.write(product_name + "\n")
+                products_f.flush()
             if not mapped:
                 # Ensure each product appears at least once with a fallback parameter if possible
                 fallback = FALLBACK_PARAM.get(category, "Material")
-                lines.append(f"{product_name};{fallback};N/A")
+                out_f.write(f"{product_name};{fallback};N/A\n")
+                out_f.flush()
                 continue
             for param_name, value in mapped:
-                lines.append(f"{product_name};{param_name};{value}")
+                out_f.write(f"{product_name};{param_name};{value}\n")
+                out_f.flush()
 
     if driver is not None:
         driver.quit()
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+    products_f.close()
+    out_f.close()
 
 
 if __name__ == "__main__":
